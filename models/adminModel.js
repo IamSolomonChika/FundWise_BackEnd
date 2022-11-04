@@ -1,11 +1,12 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
-import {User}  from "./usersModel.js";
+import User  from "./usersModel.js";
 import UserKyc from "./userKycModel.js";
 
 const AdminSchema = new mongoose.Schema({
     email: {type: String, require: true, unique: true},
     password: {type: String, require: true},
+    adminId: {type: String, require: true, unique: true},
     name: {type: String, require: true},
     role: {type: String, require: true},
     createdAt: {type: Date, default: Date.now},
@@ -15,7 +16,7 @@ const AdminSchema = new mongoose.Schema({
 AdminSchema.pre("save", async function (next) {
     try {
         const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(this.password, salt);
+        const hashedPassword = bcrypt.hash(this.password, salt);
         this.password = hashedPassword;
         next();
     } catch (error) {

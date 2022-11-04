@@ -1,14 +1,15 @@
 import jwt from 'jsonwebtoken';
-import { config } from 'dotenv'
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 const options = {
-  expiresIn: "1h",
+  expiresIn: 2 * 60 * 60,
 };
 
-async function generateJwt(email, userId) {
+const generateJwt = function (id) {
   try {
-    const payload = { email: email, id: userId };
-    const token = await jwt.sign(payload, process.env.JWT_SECRET, options);
+    const payload = {id};
+    const token = jwt.sign(payload, process.env.JWT_SECRET_KEY, options);
     return { error: false, token: token };
   } catch (error) {
     return { error: true };

@@ -5,22 +5,28 @@ import { customAlphabet as generate } from 'nanoid';
 import bcrypt from 'bcrypt';
 import { generateJwt } from '../configs/generateJwt.js';
 import sendEmail from '../services/mailer.js';
-import {User} from '../models/usersModel.js';
+import User from '../models/usersModel.js';
 
 const CHARACTER_SET =
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
-const REFERRAL_CODE_LENGTH = 6;
+const NUM_SET =
+  "0123456789ABCDEF";
 
+const REFERRAL_CODE_LENGTH = 6;
+const ACCOUNT_ID_LENGTH = 8;
+
+const accountId = generate(NUM_SET, ACCOUNT_ID_LENGTH);
 const referralCode = generate(CHARACTER_SET, REFERRAL_CODE_LENGTH);
 
-//Validate user schema
+// Validate userSchema
 const userSchema = Joi.object().keys({
   email: Joi.string().email({ minDomainSegments: 2 }),
   password: Joi.string().required().min(6),
   confirmPassword: Joi.string().valid(Joi.ref("password")).required(),
   referrer: Joi.string(),
 });
+
 
 const Signup = async (req, res) => {
   try {
@@ -46,26 +52,30 @@ const Signup = async (req, res) => {
       });
     }
 
-    const hash = await User.hashPassword(result.value.password);
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(result.value.password, salt);
 
-    const id = uuid(); //Generate unique id for the user.
+    const id = uuidv4(); //Generate unique id for the user.
     result.value.userId = id;
 
     delete result.value.confirmPassword;
     result.value.password = hash;
 
+    result.value.accountId = accountId();
+
     let code = Math.floor(100000 + Math.random() * 900000);
 
     let expiry = Date.now() + 60 * 1000 * 15; //15 mins in ms
 
-    const sendCode = await sendEmail(result.value.email, code);
+    // const sendCode = await sendEmail(result.value.email, code);
 
-    if (sendCode.error) {
-      return res.status(500).json({
-        error: true,
-        message: "Couldn't send verification email.",
-      });
-    }
+    // if (sendCode.error) {
+    //   return res.status(500).json({
+    //     error: true,
+    //     message: "Couldn't send verification email.",
+    //   });
+    // }
     result.value.emailToken = code;
     result.value.emailTokenExpires = new Date(expiry);
 
@@ -84,17 +94,68 @@ const Signup = async (req, res) => {
     result.value.referralCode = referralCode();
     const newUser = new User(result.value);
     await newUser.save();
+    const token = generateJwt(newUser.userId);
+    console.log("token", token);
 
-    return res.status(200).json({
+
+    res.cookie("token", token, {httpOnly: true, secure: true, sameSite: "none", 
+    maxAge: 1000 * 60 * 60 * 2});
+    res.status(200).json({
       success: true,
       message: "Registration Success",
-      referralCode: result.value.referralCode,
+      accountId: newUser.accountId,
     });
   } catch (error) {
     console.error("signup-error", error);
     return res.status(500).json({
       error: true,
       message: "Cannot Register",
+    });
+  }
+};
+
+
+
+// Generate a new token and resend it to the user
+const ResendToken = async (req, res) => {
+  try {
+    // Check if the email has been already registered.
+    var user = await User.findOne({
+      email: req.body.email,
+    });
+
+    if (!user) {
+      return res.status(400).send({
+        message: "Email not registered",
+      });
+    }
+
+    let code = Math.floor(100000 + Math.random() * 900000);
+
+    let expiry = Date.now() + 60 * 1000 * 15; //15 mins in ms
+
+    // const sendCode = await sendEmail(result.value.email, code);
+
+    // if (sendCode.error) {
+    //   return res.status(500).json({
+    //     error: true,
+    //     message: "Couldn't send verification email.",
+    //   });
+    // }
+    result.value.emailToken = code;
+    result.value.emailTokenExpires = new Date(expiry);
+
+    // update user token in database
+    const updatedUser = await user.save();
+    res.send(updatedUser);
+
+    res.status(200).json({
+      success: true,
+      message: "Token resent",
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message || "Some error occurred while creating the User.",
     });
   }
 };
@@ -347,7 +408,7 @@ const updatePassword = async (req, res) => {
     const hash = await User.hashPassword(newPassword);
     user.password = hash;
     await user.save();
-    
+
     return res.send({
       success: true,
       message: "Password has been changed",
@@ -403,4 +464,4 @@ const Logout = async (req, res) => {
   }
 };
 
-export {Signup, Activate, Login, ForgotPassword, ResetPassword, ReferredAccounts, Logout }
+export { Signup, Activate, Login, ForgotPassword, ResetPassword, ReferredAccounts, Logout, ResendToken }

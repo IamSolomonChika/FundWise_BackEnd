@@ -1,8 +1,10 @@
 import express from 'express';
 import { Account, Deposit, Withdrawal, CashFlow, RunningInvestment } from '../models/accountModel.js';
-import { WithdrawalRequest } from '../models/adminModel.js';
-import { User } from '../models/usersModel.js';
+import { Admin, WithdrawalRequest, Payout } from '../models/adminModel.js';
+import User from '../models/usersModel.js';
 import UserKyc from '../models/userKycModel.js';
+import { customAlphabet as generate } from 'nanoid';
+
 import Flutterwave from 'flutterwave-node-v3';
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -18,6 +20,45 @@ const trfRef = generate(CHARACTER_SET, TRFREF_LENGTH);
 
 const flw = new Flutterwave(process.env.FLW_PUBLIC_KEY, process.env.FLW_SECRET_KEY);
 
+// =====================================================================
+// ??????????????? EVERYTHING ABOUT ADMIN ACCOUNT ??????????????????????
+// =====================================================================
+// Create admin account
+const createAdmin = async (req, res) => {
+    const { email, password, name, role } = req.body;
+    try {
+        const admin = await Admin.create({ email, password, name, role });
+        res.status(201).json(admin);
+    } catch (error) {
+        res.status(409).json({ message: error.message });
+    }
+};
+
+
+// Get all admin accounts
+const getAdmins = async (req, res) => {
+    try {
+        const admins = await Admin.find();
+        res.status(200).json(admins);
+    } catch (error) {
+        res.status(404).json({ message: error.message });
+    }
+};
+
+
+// =====================================================================
+// ??????????????? EVERYTHING ABOUT DEPOSIT ????????????????????????????
+// =====================================================================
+// Get all deposits
+const getDeposits = async (req, res) => {
+    try {
+        const deposits = await Deposit.find();
+        res.status(200).json(deposits);
+    } catch (error) {
+        res.status(404).json({ message: error.message });
+    }
+}
+
 // Get total deposits of all users
 const getTotalDeposits = async (req, res) => {
     try {
@@ -29,17 +70,50 @@ const getTotalDeposits = async (req, res) => {
     }
 };
 
-// Get total deposits of all users by date range
-const getTotalDepositsByDateRange = async (req, res) => {
+// Get user deposits by accountId from user collection
+const getUserDeposits = async (req, res) => {
+    const { accountId } = req.params;
+
+    // map account id to user id
+    const user = await User.findOne({ accountId });
+
     try {
-        const { startDate, endDate } = req.body;
-        const deposits = await Deposit.find({ date: { $gte: startDate, $lte: endDate } });
-        const totalDeposits = deposits.reduce((acc, deposit) => acc + deposit.amount, 0);
-        res.status(200).json({ totalDeposits });
+        const deposits = await Deposit.find({ user: user._id });
+        res.status(200).json(deposits);
     } catch (error) {
         res.status(404).json({ message: error.message });
     }
 };
+
+// Get user deposits by email from user collection
+const getUserDepositsByEmail = async (req, res) => {
+    const { email } = req.params;
+
+    // map email to user id
+    const user = await User.findOne({ email });
+
+    try {
+        const deposits = await Deposit.find({ user: user._id });
+        res.status(200).json(deposits);
+    } catch (error) {
+        res.status(404).json({ message: error.message });
+    }
+};
+
+
+// =====================================================================
+// ??????????????? EVERYTHING ABOUT WITHDRAWAL ?????????????????????????
+// =====================================================================
+
+// Get all withdrawals
+const getWithdrawals = async (req, res) => {
+    try {
+        const withdrawals = await Withdrawal.find();
+        res.status(200).json(withdrawals);
+    } catch (error) {
+        res.status(404).json({ message: error.message });
+    }
+}
 
 // Get total withdrawals of all users
 const getTotalWithdrawals = async (req, res) => {
@@ -52,18 +126,40 @@ const getTotalWithdrawals = async (req, res) => {
     }
 };
 
-// Get total withdrawals of all users by date range
-const getTotalWithdrawalsByDateRange = async (req, res) => {
+// Get user withdrawals by AccountId from user collection
+const getUserWithdrawals = async (req, res) => {
+    const { accountId } = req.params;
+
+    // map account id to user id
+    const user = await User.findOne({ accountId });
+
     try {
-        const { startDate, endDate } = req.body;
-        const withdrawals = await Withdrawal.find({ date: { $gte: startDate, $lte: endDate } });
-        const totalWithdrawals = withdrawals.reduce((acc, withdrawal) => acc + withdrawal.amount, 0);
-        res.status(200).json({ totalWithdrawals });
+        const withdrawals = await Withdrawal.find({ user: user._id });
+        res.status(200).json(withdrawals);
     } catch (error) {
         res.status(404).json({ message: error.message });
     }
 };
 
+// Get user withdrawals by Email from user collection
+const getUserWithdrawalsByEmail = async (req, res) => {
+    const { email } = req.params;
+
+    // map email to user id
+    const user = await User.findOne({ email });
+
+    try {
+        const withdrawals = await Withdrawal.find({ user: user._id });
+        res.status(200).json(withdrawals);
+    } catch (error) {
+        res.status(404).json({ message: error.message });
+    }
+};
+
+
+// =====================================================================
+// ??????????????? EVERYTHING ABOUT INVESTMENT ?????????????????????????
+// =====================================================================
 
 // Get total running investments of all users
 const getTotalRunningInvestments = async (req, res) => {
@@ -169,4 +265,50 @@ const transferMoneyToUserBankAccount = async (req, res) => {
         res.status(404).json({ message: error.message });
     }
 }
+
+// Get all users
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find();
+        res.status(200).json({ users });
+    } catch (error) {
+        res.status(404).json({ message: error.message });
+    }
+};
+
+// Get all users by date range
+const getAllUsersByDateRange = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.body;
+        const users = await User.find({ date: { $gte: startDate, $lte: endDate } });
+        res.status(200).json({ users });
+    } catch (error) {
+        res.status(404).json({ message: error.message });
+    }
+};
+
+// Get all users by active or inactive
+const getAllUsersByActiveOrInactive = async (req, res) => {
+    try {
+        const { active } = req.body;
+        const users = await User.find({ active });
+        res.status(200).json({ users });
+    } catch (error) {
+        res.status(404).json({ message: error.message });
+    }
+};
+
+// Get user by accountId
+const getUserByAccountId = async (req, res) => {
+    try {
+        const { accountId } = req.body;
+        const user = await User.findOne({ accountId });
+        res.status(200).json({ user });
+    } catch (error) {
+        res.status(404).json({ message: error.message });
+    }
+};
+
+
+
         

@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 const Schema = mongoose.Schema;
-import { User } from './usersModel.js';
+import User from './usersModel.js';
 
 
 const userKycSchema = new Schema({
@@ -14,7 +14,7 @@ const userKycSchema = new Schema({
     state: { type: String },
     Country: { type: String },
     baseCurrency: { type: String },
-    userId: { type: Schema.Types.ObjectId, ref: 'User' },
+    user: { type: Schema.Types.ObjectId, ref: 'User' },
 }, {
     timestamps: {
         createdAt: {type: Date, default: new Date()},

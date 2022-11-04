@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { config } from 'dotenv'
 
-import {User} from '../models/usersModel.js';
+import User from '../models/usersModel.js';
 
 const validateToken = async (req, res, next) => {
   const authorizationHeader = req.headers.authorization;
